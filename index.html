@@ -402,28 +402,10 @@
             min-width: 0;
         }
 
-        /* Rotated Vertical Title like requested */
-        .fpp-title-container {
-            position: relative;
-            height: 22px;
-            min-width: 0;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-        }
-
         .fpp-title {
-            position: absolute;
-            right: 0;
-            font-size: 0.75rem;
+            font-size: 0.9rem;
             font-weight: bold;
-            color: var(--text-sub);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
             white-space: nowrap;
-            max-height: 100px;
             overflow: hidden;
             text-overflow: ellipsis;
         }
@@ -626,10 +608,7 @@
         </div>
         <div class="fpp-content">
             <div class="fpp-top-info">
-                <!-- Rotated vertical title layout matching reference image -->
-                <div class="fpp-title-container">
-                    <span class="fpp-title" id="fppTitle">No track playing</span>
-                </div>
+                <span class="fpp-title" id="fppTitle">No track playing</span>
                 <span class="fpp-subtitle">WASP VINYL RECORDS</span>
             </div>
             <div class="fpp-seek-container">
@@ -1369,7 +1348,7 @@
         canvas.addEventListener('touchmove', (e) => {
             if (e.touches.length > 0) {
                 const rect = canvas.getBoundingClientRect();
-                handleDragMove(e.touches.clientX, e.touches.clientY, rect);
+                handleDragMove(e.touches[0].clientX, e.touches[0].clientY, rect);
                 e.preventDefault();
             }
         }, { passive: false });
