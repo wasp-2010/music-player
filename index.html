@@ -170,6 +170,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .tab-buttons {
@@ -195,6 +197,55 @@
         .tab-btn:hover {
             border-color: var(--accent);
             color: var(--text-main);
+        }
+
+        /* Pill Import Button */
+        .import-pill-btn {
+            background: #f0f0f2;
+            color: #111;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.15s, background 0.2s;
+        }
+        body.light-mode .import-pill-btn {
+            background: #e5e5ea;
+            color: #111;
+        }
+        .import-pill-btn:hover {
+            transform: scale(1.03);
+            background: var(--accent);
+            color: #fff;
+        }
+        .hidden-file-input { display: none; }
+
+        /* Small Circle Theme Toggle Button */
+        .theme-circle-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s, border-color 0.2s, background 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .theme-circle-btn:hover {
+            transform: scale(1.1);
+            border-color: var(--accent);
         }
 
         /* User Profile Pill in Header */
@@ -250,27 +301,6 @@
             outline: none;
             border-color: var(--accent);
         }
-
-        /* Import Drop Zone */
-        .import-dropzone {
-            border: 2px dashed var(--border-color);
-            border-radius: 10px;
-            padding: 25px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-            margin-bottom: 15px;
-        }
-        .import-dropzone:hover {
-            border-color: var(--accent);
-            background: rgba(255, 71, 71, 0.05);
-        }
-        .import-dropzone p {
-            margin: 5px 0 0 0;
-            color: var(--text-sub);
-            font-size: 0.85rem;
-        }
-        .hidden-file-input { display: none; }
 
         /* Track List Items */
         .track-list {
@@ -490,24 +520,24 @@
                 <button class="tab-btn active" onclick="switchTab('library')">Library</button>
                 <button class="tab-btn" onclick="switchTab('albums')">Albums</button>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <!-- Small Import Pill Button -->
+                <label class="import-pill-btn">
+                    + IMPORT MUSIC
+                    <input type="file" id="fileInput" class="hidden-file-input" accept="audio/*" multiple>
+                </label>
                 <div class="user-profile-widget" id="userProfileWidget">
                     👤 <span id="loggedUserText">User</span>
                     <button class="logout-link" onclick="logoutUser()">Log Out</button>
                 </div>
-                <button class="tab-btn" onclick="toggleTheme()" id="themeToggleBtn">☀️ Light Mode</button>
+                <!-- Small Circle Theme Toggle Button -->
+                <button class="theme-circle-btn" onclick="toggleTheme()" id="themeToggleBtn" title="Toggle Theme">☀️</button>
             </div>
         </div>
 
         <div class="view-container">
             <!-- LIBRARY VIEW -->
             <div id="libraryView" class="view-pane active">
-                <label class="import-dropzone">
-                    <span style="font-size: 1rem; font-weight: bold; color: var(--accent);">+ Click to Import Music</span>
-                    <p>Supports MP3, WAV, FLAC (Extracts embedded cover art automatically)</p>
-                    <input type="file" id="fileInput" class="hidden-file-input" accept="audio/*" multiple>
-                </label>
-
                 <!-- Search Input Bar -->
                 <input type="text" id="searchInput" class="search-input" placeholder="Search your imported songs..." oninput="filterLibrary()">
 
@@ -545,7 +575,6 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div class="fpp-controls">
                     <button class="fpp-btn" onclick="playPrevTrack()" title="Previous">⏮</button>
-                    <button class="fpp-btn" onclick="stopTrack()" title="Stop">⏹</button>
                     <button class="fpp-btn fpp-play-btn" onclick="togglePlayPause()" id="fppPlayPauseBtn" title="Play/Pause">▶</button>
                     <button class="fpp-btn" onclick="playNextTrack()" title="Next">⏭</button>
                 </div>
@@ -592,22 +621,46 @@
         const OUTER_RADIUS = 280;
         const LABEL_RADIUS = 90;
 
+        let db = null;
         let isSignUpMode = false;
         let currentUser = null;
         let tracks = [];
         let albums = [];
         let currentTrackIndex = -1;
+        
         let isDragging = false;
         let lastAngle = 0;
+        let lastTime = 0;
+        let spinVelocity = 0;
         let currentRotation = 0;
-        const DEGREES_PER_SECOND = 720;
+        const NORMAL_SPEED_RAD = (Math.PI * 2 * (180 / 360)); 
         let currentVinylImg = null;
+        let lastFrameTime = performance.now();
 
-        function init() {
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('MusicPlayerDB', 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains('tracks')) {
+                        database.createObjectStore('tracks', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+            });
+        }
+
+        async function init() {
             drawVinyl(0);
             drawMiniVinyl(0);
             setupAudioListeners();
+            await initIndexedDB();
             checkExistingSession();
+            requestAnimationFrame(mainLoop);
         }
 
         function toggleAuthMode() {
@@ -643,8 +696,12 @@
                 localStorage.setItem('musicPlayerUsers', JSON.stringify(usersDB));
                 alert("Account created successfully! You are now logged in.");
             } else {
-                if (!usersDB[user] || usersDB[user] !== pass) {
-                    alert("Invalid username or password.");
+                if (!usersDB[user]) {
+                    alert("Account not found. Please Sign Up first.");
+                    return;
+                }
+                if (usersDB[user] !== pass) {
+                    alert("Invalid password.");
                     return;
                 }
             }
@@ -688,31 +745,56 @@
             authOverlay.classList.remove('hidden');
         }
 
-        function saveUserData() {
-            if (!currentUser) return;
-            // Note: Object URLs for local files cannot be stored across sessions, but metadata/names persist
-            const persistTracks = tracks.map(t => ({ name: t.name, cover: t.cover }));
-            localStorage.setItem(`musicPlayerTracks_${currentUser}`, JSON.stringify(persistTracks));
+        function saveTrackToDB(trackData) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['tracks'], 'readwrite');
+                const store = transaction.objectStore('tracks');
+                trackData.user = currentUser;
+                const request = store.add(trackData);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
         }
 
         function loadUserData() {
-            if (!currentUser) return;
-            const saved = localStorage.getItem(`musicPlayerTracks_${currentUser}`);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                tracks = parsed.map(t => ({ name: t.name, cover: t.cover, url: '' }));
+            if (!currentUser || !db) return;
+            const transaction = db.transaction(['tracks'], 'readonly');
+            const store = transaction.objectStore('tracks');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const allTracks = request.result;
+                tracks = allTracks.filter(t => t.user === currentUser).map(t => {
+                    const blob = new Blob([t.fileData], { type: t.fileType });
+                    return {
+                        id: t.id,
+                        name: t.name,
+                        cover: t.cover,
+                        url: URL.createObjectURL(blob)
+                    };
+                });
                 buildDefaultAlbum();
                 renderLibrary();
                 renderAlbums();
-            }
+            };
+        }
+
+        function deleteTrackFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['tracks'], 'readwrite');
+                const store = transaction.objectStore('tracks');
+                const request = store.delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
         }
 
         function toggleTheme() {
             document.body.classList.toggle('light-mode');
             if (document.body.classList.contains('light-mode')) {
-                themeToggleBtn.innerText = '🌙 Dark Mode';
+                themeToggleBtn.innerText = '🌙';
             } else {
-                themeToggleBtn.innerText = '☀️ Light Mode';
+                themeToggleBtn.innerText = '☀️';
             }
         }
 
@@ -823,7 +905,6 @@
 
             fppCtx.beginPath();
             fppCtx.arc(center, center, 4, 0, Math.PI * 2);
-            fppCtx.fillStyle = '#111';
             fppCtx.fill();
             fppCtx.strokeStyle = '#444';
             fppCtx.stroke();
@@ -840,7 +921,6 @@
             audioPlayer.addEventListener('pause', () => {
                 fppPlayPauseBtn.innerText = '▶';
             });
-            audioPlayer.addEventListener('timeupdate', updateProgress);
             audioPlayer.addEventListener('ended', playNextTrack);
         }
 
@@ -850,18 +930,43 @@
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
         }
 
-        function updateProgress() {
-            if (!audioPlayer.duration) return;
-            const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-            seekSlider.value = progressPercent;
-            currentTimeText.innerText = formatTime(audioPlayer.currentTime);
-            durationText.innerText = formatTime(audioPlayer.duration);
+        function mainLoop(timestamp) {
+            const deltaTime = (timestamp - lastFrameTime) / 1000;
+            lastFrameTime = timestamp;
 
-            if (!audioPlayer.paused) {
-                currentRotation += 0.02;
+            if (audioPlayer.duration && !audioPlayer.paused && !isDragging) {
+                const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                seekSlider.value = progressPercent;
+                currentTimeText.innerText = formatTime(audioPlayer.currentTime);
+                durationText.innerText = formatTime(audioPlayer.duration);
+            }
+
+            if (isDragging) {
+                // Handled via mousemove event
+            } else if (Math.abs(spinVelocity) > 0.01) {
+                currentRotation += spinVelocity * deltaTime;
+                const targetVelocity = audioPlayer.paused ? 0 : NORMAL_SPEED_RAD;
+                spinVelocity += (targetVelocity - spinVelocity) * Math.min(1, deltaTime * 3);
+
+                if (audioPlayer.src && !audioPlayer.paused) {
+                    let calculatedRate = Math.abs(spinVelocity / NORMAL_SPEED_RAD);
+                    audioPlayer.playbackRate = Math.max(0.2, Math.min(calculatedRate, 5.0));
+                }
+
+                drawVinyl(currentRotation);
+                drawMiniVinyl(currentRotation);
+            } else if (!audioPlayer.paused) {
+                currentRotation += NORMAL_SPEED_RAD * deltaTime;
+                audioPlayer.playbackRate = 1.0;
+                drawVinyl(currentRotation);
+                drawMiniVinyl(currentRotation);
+                spinVelocity = NORMAL_SPEED_RAD;
+            } else {
                 drawVinyl(currentRotation);
                 drawMiniVinyl(currentRotation);
             }
+
+            requestAnimationFrame(mainLoop);
         }
 
         function seekAudio(value) {
@@ -872,16 +977,11 @@
         function togglePlayPause() {
             if (!audioPlayer.src) return;
             if (audioPlayer.paused) {
+                audioPlayer.playbackRate = 1.0;
                 audioPlayer.play();
             } else {
                 audioPlayer.pause();
             }
-        }
-
-        function stopTrack() {
-            audioPlayer.pause();
-            audioPlayer.currentTime = 0;
-            fppPlayPauseBtn.innerText = '▶';
         }
 
         function playPrevTrack() {
@@ -906,8 +1006,6 @@
             const files = e.target.files;
             
             Array.from(files).forEach(file => {
-                const trackUrl = URL.createObjectURL(file);
-                
                 window.jsmediatags.read(file, {
                     onSuccess: function(tag) {
                         const picture = tag.tags.picture;
@@ -921,36 +1019,60 @@
                             coverUrl = `data:${picture.format};base64,${window.btoa(base64String)}`;
                         }
 
-                        tracks.push({
-                            name: file.name,
-                            url: trackUrl,
-                            cover: coverUrl
+                        file.arrayBuffer().then(arrayBuffer => {
+                            const trackData = {
+                                name: file.name,
+                                fileData: arrayBuffer,
+                                fileType: file.type,
+                                cover: coverUrl
+                            };
+
+                            saveTrackToDB(trackData).then(id => {
+                                const blob = new Blob([arrayBuffer], { type: file.type });
+                                tracks.push({
+                                    id: id,
+                                    name: file.name,
+                                    url: URL.createObjectURL(blob),
+                                    cover: coverUrl
+                                });
+
+                                buildDefaultAlbum();
+                                renderLibrary(searchInput.value);
+                                renderAlbums();
+
+                                if (currentTrackIndex === -1 && tracks.length > 0) {
+                                    loadTrack(0);
+                                }
+                            });
                         });
-
-                        buildDefaultAlbum();
-                        renderLibrary(searchInput.value);
-                        renderAlbums();
-                        saveUserData();
-
-                        if (currentTrackIndex === -1 && tracks.length > 0) {
-                            loadTrack(0);
-                        }
                     },
-                    onError: function(error) {
-                        tracks.push({
-                            name: file.name,
-                            url: trackUrl,
-                            cover: null
+                    onError: function() {
+                        file.arrayBuffer().then(arrayBuffer => {
+                            const trackData = {
+                                name: file.name,
+                                fileData: arrayBuffer,
+                                fileType: file.type,
+                                cover: null
+                            };
+
+                            saveTrackToDB(trackData).then(id => {
+                                const blob = new Blob([arrayBuffer], { type: file.type });
+                                tracks.push({
+                                    id: id,
+                                    name: file.name,
+                                    url: URL.createObjectURL(blob),
+                                    cover: null
+                                });
+
+                                buildDefaultAlbum();
+                                renderLibrary(searchInput.value);
+                                renderAlbums();
+
+                                if (currentTrackIndex === -1 && tracks.length > 0) {
+                                    loadTrack(0);
+                                }
+                            });
                         });
-
-                        buildDefaultAlbum();
-                        renderLibrary(searchInput.value);
-                        renderAlbums();
-                        saveUserData();
-
-                        if (currentTrackIndex === -1 && tracks.length > 0) {
-                            loadTrack(0);
-                        }
                     }
                 });
             });
@@ -1018,16 +1140,18 @@
             const track = tracks[index];
             
             if (!track.url) {
-                alert("Please re-upload or select local file data to play this saved track in your current browser session.");
+                alert("Track data not available.");
                 return;
             }
 
             audioPlayer.src = track.url;
+            audioPlayer.playbackRate = 1.0;
             nowPlayingText.innerText = track.name;
             fppTitle.innerText = track.name;
             renderLibrary(searchInput.value);
             
             currentRotation = 0;
+            spinVelocity = NORMAL_SPEED_RAD;
 
             if (track.cover) {
                 currentVinylImg = new Image();
@@ -1044,6 +1168,7 @@
         }
 
         function deleteTrack(index) {
+            const track = tracks[index];
             if (currentTrackIndex === index) {
                 audioPlayer.pause();
                 audioPlayer.src = '';
@@ -1053,12 +1178,17 @@
                 currentVinylImg = null;
                 drawVinyl(0);
                 drawMiniVinyl(0);
+                currentTrackIndex = -1;
+            } else if (currentTrackIndex > index) {
+                currentTrackIndex--;
             }
-            tracks.splice(index, 1);
-            buildDefaultAlbum();
-            renderLibrary(searchInput.value);
-            renderAlbums();
-            saveUserData();
+
+            deleteTrackFromDB(track.id).then(() => {
+                tracks.splice(index, 1);
+                buildDefaultAlbum();
+                renderLibrary(searchInput.value);
+                renderAlbums();
+            });
         }
 
         function getAngle(x, y) {
@@ -1067,806 +1197,32 @@
 
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
+            spinVelocity = 0; 
+            if (audioPlayer.src) {
+                audioPlayer.play();
+                fppPlayPauseBtn.innerText = '⏸';
+            }
             canvas.classList.add('is-dragging');
             const rect = canvas.getBoundingClientRect();
             lastAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
+            lastTime = performance.now();
         });
 
         window.addEventListener('mouseup', () => {
-            isDragging = false;
-            canvas.classList.remove('is-dragging');
+            if (isDragging) {
+                isDragging = false;
+                canvas.classList.remove('is-dragging');
+            }
         });
 
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging || !audioPlayer.src) return;
 
             const rect = canvas.getBoundingClientRect();
+            const currentTime = performance.now();
             const currentMouseAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
-            let deltaAngle = currentMouseAngle - lastAngle;
-
-            if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
-            if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
-
-            currentRotation += deltaAngle;
-            drawVinyl(currentRotation);
-            drawMiniVinyl(currentRotation);
-
-            const deltaDegrees = deltaAngle * (180 / Math.PI);
-            const seekSeconds = deltaDegrees / (DEGREES_PER_SECOND / 2);
-            let newTime = audioPlayer.currentTime + seekSeconds;
-            audioPlayer.currentTime = Math.max(0, Math.min(newTime, audioPlayer.duration));
-
-            lastAngle = currentMouseAngle;
-        });
-
-        init();
-    </script>
-</body>
-</html>            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            transition: background 0.3s, color 0.3s;
-        }
-
-        /* Left Column: The Turntable */
-        .turntable-section {
-            width: 45%;
-            background: var(--turntable-bg);
-            border-right: 2px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            overflow: hidden; /* Clips the big vinyl so only the right half is visible */
-            transition: background 0.3s, border-color 0.3s;
-        }
-
-        #vinylCanvas {
-            position: absolute;
-            left: -175px; /* Pushes half of the 350px vinyl completely out of screen to the left */
-            cursor: grab;
-            user-select: none;
-            -webkit-user-select: none;
-            border-radius: 50%;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
-        }
-        #vinylCanvas.is-dragging { cursor: grabbing; }
-
-        .now-playing-label {
-            position: absolute;
-            bottom: 30px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: var(--accent);
-            text-align: center;
-            padding: 0 20px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 80%;
-            z-index: 10;
-        }
-
-        /* Right Column: Navigation & Content */
-        .content-section {
-            width: 55%;
-            padding: 30px 30px 140px 30px;
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-base);
-            transition: background 0.3s;
-            box-sizing: border-box;
-        }
-
-        .nav-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .tab-buttons {
-            display: flex;
-            gap: 10px;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-sub);
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .tab-btn.active {
-            background: var(--text-main);
-            color: var(--bg-base);
-            border-color: var(--text-main);
-        }
-        .tab-btn:hover {
-            border-color: var(--accent);
-            color: var(--text-main);
-        }
-
-        /* Dynamic View Container */
-        .view-container {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            transition: background 0.3s, border-color 0.3s;
-        }
-
-        .view-pane { display: none; flex: 1; flex-direction: column; }
-        .view-pane.active { display: flex; }
-
-        /* Search Input */
-        .search-input {
-            width: 100%;
-            background: var(--bg-base);
-            border: 1px solid var(--border-color);
-            padding: 10px 15px;
-            border-radius: 8px;
-            color: var(--text-main);
-            font-size: 0.95rem;
-            margin-bottom: 15px;
-            box-sizing: border-box;
-        }
-        .search-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        /* Import Drop Zone */
-        .import-dropzone {
-            border: 2px dashed var(--border-color);
-            border-radius: 10px;
-            padding: 25px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-            margin-bottom: 15px;
-        }
-        .import-dropzone:hover {
-            border-color: var(--accent);
-            background: rgba(255, 71, 71, 0.05);
-        }
-        .import-dropzone p {
-            margin: 5px 0 0 0;
-            color: var(--text-sub);
-            font-size: 0.85rem;
-        }
-        .hidden-file-input { display: none; }
-
-        /* Track List Items */
-        .track-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .list-item {
-            padding: 12px 15px;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 6px;
-            transition: background 0.15s;
-        }
-        .list-item:hover { background: var(--bg-hover); }
-
-        .delete-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-sub);
-            cursor: pointer;
-            font-size: 0.9rem;
-        }
-        .delete-btn:hover { color: var(--accent); }
-
-        /* Floating Pill Player Widget (Bottom Right, Half-Hidden Vinyl sticking out left) */
-        .floating-pill-player {
-            position: fixed;
-            bottom: 25px;
-            right: 25px;
-            background: rgba(24, 24, 24, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--border-color);
-            border-radius: 40px;
-            padding: 16px 24px 16px 80px;
-            width: 380px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            z-index: 1000;
-            color: #fff;
-            transition: background 0.3s, border-color 0.3s;
-            overflow: visible;
-        }
-
-        body.light-mode .floating-pill-player {
-            background: rgba(255, 255, 255, 0.95);
-            color: #111;
-        }
-
-        .fpp-artwork-container {
-            position: absolute;
-            left: -55px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 130px;
-            height: 130px;
-            border-radius: 50%;
-            box-shadow: -5px 5px 20px rgba(0,0,0,0.5);
-            cursor: grab;
-        }
-        .fpp-artwork-container.is-dragging { cursor: grabbing; }
-
-        #fppVinylCanvas {
-            border-radius: 50%;
-            display: block;
-        }
-
-        .fpp-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            min-width: 0;
-        }
-
-        .fpp-top-info {
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-        }
-
-        .fpp-title {
-            font-size: 0.9rem;
-            font-weight: bold;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .fpp-subtitle {
-            font-size: 0.75rem;
-            color: var(--text-sub);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .fpp-seek-container {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-
-        .fpp-seekbar {
-            width: 100%;
-            -webkit-appearance: none;
-            background: #444;
-            height: 4px;
-            border-radius: 2px;
-            outline: none;
-            cursor: pointer;
-            accent-color: var(--accent);
-        }
-
-        .fpp-times {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.7rem;
-            color: var(--text-sub);
-        }
-
-        .fpp-controls {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .fpp-btn {
-            background: transparent;
-            border: none;
-            color: inherit;
-            cursor: pointer;
-            font-size: 0.9rem;
-            padding: 4px;
-            opacity: 0.8;
-            transition: opacity 0.15s, transform 0.15s, color 0.15s;
-        }
-        .fpp-btn:hover {
-            opacity: 1;
-            color: var(--accent);
-            transform: scale(1.1);
-        }
-
-        .fpp-play-btn {
-            background: var(--text-main);
-            color: var(--bg-base);
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9rem;
-            opacity: 1;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        }
-        .fpp-play-btn:hover {
-            background: var(--accent);
-            color: #fff;
-            transform: scale(1.05);
-        }
-
-        .fpp-volume-container {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 2px;
-        }
-        .fpp-volume-slider {
-            width: 60px;
-            -webkit-appearance: none;
-            background: #444;
-            height: 3px;
-            border-radius: 2px;
-            outline: none;
-            cursor: pointer;
-            accent-color: var(--accent);
-        }
-
-        .empty-state {
-            text-align: center;
-            color: var(--text-sub);
-            margin-top: 30px;
-        }
-    </style>
-</head>
-<body>
-
-    <!-- LEFT: TURNTABLE WITH BIG HALF-HIDDEN VINYL -->
-    <div class="turntable-section">
-        <canvas id="vinylCanvas" width="600" height="600"></canvas>
-        <div class="now-playing-label" id="nowPlayingText">No track selected</div>
-    </div>
-
-    <!-- RIGHT: NAVIGATION TABS & CONTENT -->
-    <div class="content-section">
-        <div class="nav-header">
-            <div class="tab-buttons">
-                <button class="tab-btn active" onclick="switchTab('library')">Library</button>
-                <button class="tab-btn" onclick="switchTab('albums')">Albums</button>
-            </div>
-            <!-- Theme Toggle Button -->
-            <button class="tab-btn" onclick="toggleTheme()" id="themeToggleBtn">☀️ Light Mode</button>
-        </div>
-
-        <div class="view-container">
-            <!-- LIBRARY VIEW -->
-            <div id="libraryView" class="view-pane active">
-                <label class="import-dropzone">
-                    <span style="font-size: 1rem; font-weight: bold; color: var(--accent);">+ Click to Import Music</span>
-                    <p>Supports MP3, WAV, FLAC</p>
-                    <input type="file" id="fileInput" class="hidden-file-input" accept="audio/*" multiple>
-                </label>
-
-                <!-- Search Input Bar -->
-                <input type="text" id="searchInput" class="search-input" placeholder="Search your imported songs..." oninput="filterLibrary()">
-
-                <div id="libraryList" class="track-list">
-                    <div class="empty-state">Your imported songs will appear here.</div>
-                </div>
-            </div>
-
-            <!-- ALBUMS VIEW -->
-            <div id="albumsView" class="view-pane">
-                <div id="albumsList" style="flex: 1; overflow-y: auto;">
-                    <div class="empty-state">No custom albums created yet.</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- FLOATING PILL PLAYER WIDGET WITH HALF-HIDDEN VINYL -->
-    <div class="floating-pill-player">
-        <div class="fpp-artwork-container" id="fppArtworkContainer">
-            <canvas id="fppVinylCanvas" width="130" height="130"></canvas>
-        </div>
-        <div class="fpp-content">
-            <div class="fpp-top-info">
-                <span class="fpp-title" id="fppTitle">No track playing</span>
-                <span class="fpp-subtitle">BLAZE VINYL RECORDS</span>
-            </div>
-            <div class="fpp-seek-container">
-                <input type="range" id="seekSlider" class="fpp-seekbar" value="0" min="0" max="100" step="0.1" oninput="seekAudio(this.value)">
-                <div class="fpp-times">
-                    <span id="currentTimeText">0:00</span>
-                    <span id="durationText">0:00</span>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div class="fpp-controls">
-                    <button class="fpp-btn" onclick="playPrevTrack()" title="Previous">⏮</button>
-                    <button class="fpp-btn" onclick="stopTrack()" title="Stop">⏹</button>
-                    <button class="fpp-btn fpp-play-btn" onclick="togglePlayPause()" id="fppPlayPauseBtn" title="Play/Pause">▶</button>
-                    <button class="fpp-btn" onclick="playNextTrack()" title="Next">⏭</button>
-                </div>
-                <div class="fpp-volume-container">
-                    <span style="font-size: 0.75rem;">🔊</span>
-                    <input type="range" min="0" max="1" step="0.01" value="1" class="fpp-volume-slider" oninput="changeVolume(this.value)">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Hidden Audio Element -->
-    <audio id="audioPlayer"></audio>
-
-    <script>
-        const canvas = document.getElementById('vinylCanvas');
-        const ctx = canvas.getContext('2d');
-        const fppCanvas = document.getElementById('fppVinylCanvas');
-        const fppCtx = fppCanvas.getContext('2d');
-
-        const audioPlayer = document.getElementById('audioPlayer');
-        const fileInput = document.getElementById('fileInput');
-        const searchInput = document.getElementById('searchInput');
-        const libraryList = document.getElementById('libraryList');
-        const albumsList = document.getElementById('albumsList');
-        const nowPlayingText = document.getElementById('nowPlayingText');
-        const themeToggleBtn = document.getElementById('themeToggleBtn');
-        const fppTitle = document.getElementById('fppTitle');
-        const fppPlayPauseBtn = document.getElementById('fppPlayPauseBtn');
-        const seekSlider = document.getElementById('seekSlider');
-        const currentTimeText = document.getElementById('currentTimeText');
-        const durationText = document.getElementById('durationText');
-
-        const CANVAS_SIZE = 600;
-        const CENTER = CANVAS_SIZE / 2;
-        const OUTER_RADIUS = 280;
-        const LABEL_RADIUS = 90;
-
-        let tracks = [];
-        let albums = [];
-        let currentTrackIndex = -1;
-        let isDragging = false;
-        let lastAngle = 0;
-        let currentRotation = 0;
-        const DEGREES_PER_SECOND = 720;
-        let vinylImg = null;
-
-        function init() {
-            drawVinyl(0);
-            drawMiniVinyl(0);
-            setupAudioListeners();
-        }
-
-        function toggleTheme() {
-            document.body.classList.toggle('light-mode');
-            if (document.body.classList.contains('light-mode')) {
-                themeToggleBtn.innerText = '🌙 Dark Mode';
-            } else {
-                themeToggleBtn.innerText = '☀️ Light Mode';
-            }
-        }
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                if(btn !== themeToggleBtn) btn.classList.remove('active');
-            });
-            document.querySelectorAll('.view-pane').forEach(pane => pane.classList.remove('active'));
-
-            if (tabName === 'library') {
-                document.querySelector('.tab-buttons button:nth-child(1)').classList.add('active');
-                document.getElementById('libraryView').classList.add('active');
-            } else {
-                document.querySelector('.tab-buttons button:nth-child(2)').classList.add('active');
-                document.getElementById('albumsView').classList.add('active');
-            }
-        }
-
-        function drawVinyl(rotation) {
-            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-            ctx.beginPath();
-            ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = '#111';
-            ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#222';
-            ctx.stroke();
-
-            ctx.beginPath();
-            for(let i = LABEL_RADIUS + 25; i < OUTER_RADIUS - 15; i += 8) {
-                 ctx.arc(CENTER, CENTER, i, 0, Math.PI * 2);
-            }
-            ctx.stroke();
-
-            ctx.save();
-            ctx.translate(CENTER, CENTER);
-            ctx.rotate(rotation);
-
-            ctx.beginPath();
-            ctx.arc(0, 0, LABEL_RADIUS, 0, Math.PI * 2);
-            ctx.clip();
-
-            if (vinylImg) {
-                ctx.drawImage(vinylImg, -LABEL_RADIUS, -LABEL_RADIUS, LABEL_RADIUS * 2, LABEL_RADIUS * 2);
-            } else {
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(-LABEL_RADIUS, -LABEL_RADIUS, LABEL_RADIUS * 2, LABEL_RADIUS * 2);
-            }
-            ctx.restore();
-
-            ctx.beginPath();
-            ctx.arc(CENTER, CENTER, LABEL_RADIUS, 0, Math.PI * 2);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#ddd';
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(CENTER, CENTER, 8, 0, Math.PI * 2);
-            ctx.fillStyle = '#111';
-            ctx.fill();
-            ctx.strokeStyle = '#444';
-            ctx.stroke();
-        }
-
-        function drawMiniVinyl(rotation) {
-            const size = 130;
-            const center = size / 2;
-            const outerR = 62;
-            const labelR = 24;
-
-            fppCtx.clearRect(0, 0, size, size);
-
-            fppCtx.beginPath();
-            fppCtx.arc(center, center, outerR, 0, Math.PI * 2);
-            fppCtx.fillStyle = '#111';
-            fppCtx.fill();
-            fppCtx.lineWidth = 1.5;
-            fppCtx.strokeStyle = '#333';
-            fppCtx.stroke();
-
-            fppCtx.beginPath();
-            for(let i = labelR + 8; i < outerR - 5; i += 4) {
-                 fppCtx.arc(center, center, i, 0, Math.PI * 2);
-            }
-            fppCtx.stroke();
-
-            fppCtx.save();
-            fppCtx.translate(center, center);
-            fppCtx.rotate(rotation);
-            fppCtx.beginPath();
-            fppCtx.arc(0, 0, labelR, 0, Math.PI * 2);
-            fppCtx.clip();
-
-            fppCtx.fillStyle = '#ffffff';
-            fppCtx.fillRect(-labelR, -labelR, labelR * 2, labelR * 2);
-            fppCtx.restore();
-
-            fppCtx.beginPath();
-            fppCtx.arc(center, center, labelR, 0, Math.PI * 2);
-            fppCtx.lineWidth = 1.5;
-            fppCtx.strokeStyle = '#ddd';
-            fppCtx.stroke();
-
-            fppCtx.beginPath();
-            fppCtx.arc(center, center, 4, 0, Math.PI * 2);
-            fppCtx.fillStyle = '#111';
-            fppCtx.fill();
-            fppCtx.strokeStyle = '#444';
-            fppCtx.stroke();
-        }
-
-        function setupAudioListeners() {
-            audioPlayer.addEventListener('loadedmetadata', () => {
-                audioPlayer.play();
-                fppPlayPauseBtn.innerText = '⏸';
-            });
-            audioPlayer.addEventListener('play', () => {
-                fppPlayPauseBtn.innerText = '⏸';
-            });
-            audioPlayer.addEventListener('pause', () => {
-                fppPlayPauseBtn.innerText = '▶';
-            });
-            audioPlayer.addEventListener('timeupdate', updateProgress);
-            audioPlayer.addEventListener('ended', playNextTrack);
-        }
-
-        function formatTime(seconds) {
-            let mins = Math.floor(seconds / 60);
-            let secs = Math.floor(seconds % 60);
-            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-        }
-
-        function updateProgress() {
-            if (!audioPlayer.duration) return;
-            const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-            seekSlider.value = progressPercent;
-            currentTimeText.innerText = formatTime(audioPlayer.currentTime);
-            durationText.innerText = formatTime(audioPlayer.duration);
-
-            if (!audioPlayer.paused) {
-                currentRotation += 0.02;
-                drawVinyl(currentRotation);
-                drawMiniVinyl(currentRotation);
-            }
-        }
-
-        function seekAudio(value) {
-            if (!audioPlayer.duration) return;
-            audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-        }
-
-        function togglePlayPause() {
-            if (!audioPlayer.src) return;
-            if (audioPlayer.paused) {
-                audioPlayer.play();
-            } else {
-                audioPlayer.pause();
-            }
-        }
-
-        function stopTrack() {
-            audioPlayer.pause();
-            audioPlayer.currentTime = 0;
-            fppPlayPauseBtn.innerText = '▶';
-        }
-
-        function playPrevTrack() {
-            if (tracks.length === 0) return;
-            let prevIndex = currentTrackIndex - 1;
-            if (prevIndex < 0) prevIndex = tracks.length - 1;
-            loadTrack(prevIndex);
-        }
-
-        function playNextTrack() {
-            if (tracks.length === 0) return;
-            let nextIndex = currentTrackIndex + 1;
-            if (nextIndex >= tracks.length) nextIndex = 0;
-            loadTrack(nextIndex);
-        }
-
-        function changeVolume(val) {
-            audioPlayer.volume = val;
-        }
-
-        fileInput.addEventListener('change', function(e) {
-            const files = e.target.files;
-            for (let file of files) {
-                const trackUrl = URL.createObjectURL(file);
-                tracks.push({ name: file.name, url: trackUrl });
-            }
-            buildDefaultAlbum();
-            renderLibrary();
-            renderAlbums();
-
-            if (currentTrackIndex === -1 && tracks.length > 0) {
-                loadTrack(0);
-            }
-        });
-
-        function buildDefaultAlbum() {
-            albums = [{ name: 'Imported Library', tracks: [...tracks] }];
-        }
-
-        function renderLibrary(filterText = '') {
-            if (tracks.length === 0) {
-                libraryList.innerHTML = `<div class="empty-state">Your imported songs will appear here.</div>`;
-                return;
-            }
-
-            const filteredTracks = tracks.map((track, originalIndex) => ({ track, originalIndex }))
-                .filter(({ track }) => track.name.toLowerCase().includes(filterText.toLowerCase()));
-
-            if (filteredTracks.length === 0) {
-                libraryList.innerHTML = `<div class="empty-state">No matching songs found.</div>`;
-                return;
-            }
-
-            libraryList.innerHTML = '';
-            filteredTracks.forEach(({ track, originalIndex }) => {
-                const item = document.createElement('div');
-                item.className = `list-item ${originalIndex === currentTrackIndex ? 'active' : ''}`;
-                item.innerHTML = `
-                    <span onclick="loadTrack(${originalIndex})" style="flex:1;">🎵 ${track.name}</span>
-                    <button class="delete-disc" onclick="deleteTrack(${originalIndex})">✕</button>
-                `;
-                item.querySelector('.delete-disc').className = 'delete-btn';
-                libraryList.appendChild(item);
-            });
-        }
-
-        function filterLibrary() {
-            const query = searchInput.value;
-            renderLibrary(query);
-        }
-
-        function renderAlbums() {
-            if (albums.length === 0 || tracks.length === 0) {
-                albumsList.innerHTML = `<div class="empty-state">No custom albums created yet.</div>`;
-                return;
-            }
-            albumsList.innerHTML = '';
-            albums.forEach(album => {
-                const albumCard = document.createElement('div');
-                albumCard.style.marginBottom = '15px';
-                albumCard.innerHTML = `<h4 style="margin: 5px 0 10px 0; color: var(--accent);">${album.name} (${album.tracks.length} tracks)</h4>`;
-                
-                album.tracks.forEach((track) => {
-                    const trackRow = document.createElement('div');
-                    trackRow.className = 'list-item';
-                    trackRow.innerHTML = `<span>💿 ${track.name}</span>`;
-                    albumCard.appendChild(trackRow);
-                });
-                albumsList.appendChild(albumCard);
-            });
-        }
-
-        function loadTrack(index) {
-            currentTrackIndex = index;
-            const track = tracks[index];
-            audioPlayer.src = track.url;
-            nowPlayingText.innerText = track.name;
-            fppTitle.innerText = track.name;
-            renderLibrary(searchInput.value);
             
-            currentRotation = 0;
-            drawVinyl(0);
-            drawMiniVinyl(0);
-        }
-
-        function deleteTrack(index) {
-            if (currentTrackIndex === index) {
-                audioPlayer.pause();
-                audioPlayer.src = '';
-                nowPlayingText.innerText = 'No track selected';
-                fppTitle.innerText = 'No track playing';
-                fppPlayPauseBtn.innerText = '▶';
-            }
-            tracks.splice(index, 1);
-            buildDefaultAlbum();
-            renderLibrary(searchInput.value);
-            renderAlbums();
-        }
-
-        function getAngle(x, y) {
-            return Math.atan2(y - CENTER, x - CENTER);
-        }
-
-        canvas.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            canvas.classList.add('is-dragging');
-            const rect = canvas.getBoundingClientRect();
-            lastAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
-        });
-
-        window.addEventListener('mouseup', () => {
-            isDragging = false;
-            canvas.classList.remove('is-dragging');
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDragging || !audioPlayer.src) return;
-
-            const rect = canvas.getBoundingClientRect();
-            const currentMouseAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
             let deltaAngle = currentMouseAngle - lastAngle;
-
             if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
             if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
 
@@ -1874,12 +1230,20 @@
             drawVinyl(currentRotation);
             drawMiniVinyl(currentRotation);
 
+            const timeDelta = currentTime - lastTime;
+            if (timeDelta > 0) {
+                spinVelocity = deltaAngle / (timeDelta / 1000);
+                let calculatedRate = Math.abs(spinVelocity / NORMAL_SPEED_RAD);
+                audioPlayer.playbackRate = Math.max(0.2, Math.min(calculatedRate, 5.0));
+            }
+
             const deltaDegrees = deltaAngle * (180 / Math.PI);
-            const seekSeconds = deltaDegrees / (DEGREES_PER_SECOND / 2);
+            const seekSeconds = deltaDegrees / 90;
             let newTime = audioPlayer.currentTime + seekSeconds;
             audioPlayer.currentTime = Math.max(0, Math.min(newTime, audioPlayer.duration));
 
             lastAngle = currentMouseAngle;
+            lastTime = currentTime;
         });
 
         init();
