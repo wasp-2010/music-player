@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blaze Vinyl Player</title>
+    <title>music player</title>
     <style>
         /* Default Dark Theme Variables */
         :root {
@@ -50,20 +50,24 @@
             justify-content: center;
             align-items: center;
             position: relative;
+            overflow: hidden; /* Clips the big vinyl so only the right half is visible */
             transition: background 0.3s, border-color 0.3s;
         }
 
         #vinylCanvas {
+            position: absolute;
+            left: -175px; /* Pushes half of the 350px vinyl completely out of screen to the left */
             cursor: grab;
             user-select: none;
             -webkit-user-select: none;
             border-radius: 50%;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
         }
         #vinylCanvas.is-dragging { cursor: grabbing; }
 
         .now-playing-label {
-            margin-top: 25px;
+            position: absolute;
+            bottom: 30px;
             font-size: 1.1rem;
             font-weight: bold;
             color: var(--accent);
@@ -73,6 +77,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 80%;
+            z-index: 10;
         }
 
         /* Right Column: Navigation & Content */
@@ -208,7 +213,7 @@
             backdrop-filter: blur(10px);
             border: 1px solid var(--border-color);
             border-radius: 40px;
-            padding: 16px 24px 16px 80px; /* Extra left padding to make room for the half-hidden vinyl */
+            padding: 16px 24px 16px 80px;
             width: 380px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.5);
             display: flex;
@@ -217,7 +222,7 @@
             z-index: 1000;
             color: #fff;
             transition: background 0.3s, border-color 0.3s;
-            overflow: visible; /* Allows vinyl to pop out of the container bounds */
+            overflow: visible;
         }
 
         body.light-mode .floating-pill-player {
@@ -225,10 +230,9 @@
             color: #111;
         }
 
-        /* Large half-hidden vinyl artwork protruding out on the left */
         .fpp-artwork-container {
             position: absolute;
-            left: -55px; /* Pulls half of the 130px vinyl outside the pill */
+            left: -55px;
             top: 50%;
             transform: translateY(-50%);
             width: 130px;
@@ -365,9 +369,9 @@
 </head>
 <body>
 
-    <!-- LEFT: TURNTABLE WITH VINYL COVER -->
+    <!-- LEFT: TURNTABLE WITH BIG HALF-HIDDEN VINYL -->
     <div class="turntable-section">
-        <canvas id="vinylCanvas" width="350" height="350"></canvas>
+        <canvas id="vinylCanvas" width="600" height="600"></canvas>
         <div class="now-playing-label" id="nowPlayingText">No track selected</div>
     </div>
 
@@ -448,7 +452,6 @@
         const ctx = canvas.getContext('2d');
         const fppCanvas = document.getElementById('fppVinylCanvas');
         const fppCtx = fppCanvas.getContext('2d');
-        const fppArtworkContainer = document.getElementById('fppArtworkContainer');
 
         const audioPlayer = document.getElementById('audioPlayer');
         const fileInput = document.getElementById('fileInput');
@@ -463,10 +466,10 @@
         const currentTimeText = document.getElementById('currentTimeText');
         const durationText = document.getElementById('durationText');
 
-        const CANVAS_SIZE = 350;
+        const CANVAS_SIZE = 600;
         const CENTER = CANVAS_SIZE / 2;
-        const OUTER_RADIUS = 165;
-        const LABEL_RADIUS = 55;
+        const OUTER_RADIUS = 280;
+        const LABEL_RADIUS = 90;
 
         let tracks = [];
         let albums = [];
@@ -514,12 +517,12 @@
             ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = '#111';
             ctx.fill();
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.strokeStyle = '#222';
             ctx.stroke();
 
             ctx.beginPath();
-            for(let i = LABEL_RADIUS + 15; i < OUTER_RADIUS - 10; i += 5) {
+            for(let i = LABEL_RADIUS + 25; i < OUTER_RADIUS - 15; i += 8) {
                  ctx.arc(CENTER, CENTER, i, 0, Math.PI * 2);
             }
             ctx.stroke();
@@ -535,7 +538,7 @@
             if (vinylImg) {
                 ctx.drawImage(vinylImg, -LABEL_RADIUS, -LABEL_RADIUS, LABEL_RADIUS * 2, LABEL_RADIUS * 2);
             } else {
-                ctx.fillStyle = '#ff4747';
+                ctx.fillStyle = '#ffffff';
                 ctx.fillRect(-LABEL_RADIUS, -LABEL_RADIUS, LABEL_RADIUS * 2, LABEL_RADIUS * 2);
             }
             ctx.restore();
@@ -543,11 +546,11 @@
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, LABEL_RADIUS, 0, Math.PI * 2);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = '#444';
+            ctx.strokeStyle = '#ddd';
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.arc(CENTER, CENTER, 6, 0, Math.PI * 2);
+            ctx.arc(CENTER, CENTER, 8, 0, Math.PI * 2);
             ctx.fillStyle = '#111';
             ctx.fill();
             ctx.strokeStyle = '#444';
@@ -583,14 +586,14 @@
             fppCtx.arc(0, 0, labelR, 0, Math.PI * 2);
             fppCtx.clip();
 
-            fppCtx.fillStyle = '#ff4747';
+            fppCtx.fillStyle = '#ffffff';
             fppCtx.fillRect(-labelR, -labelR, labelR * 2, labelR * 2);
             fppCtx.restore();
 
             fppCtx.beginPath();
             fppCtx.arc(center, center, labelR, 0, Math.PI * 2);
             fppCtx.lineWidth = 1.5;
-            fppCtx.strokeStyle = '#444';
+            fppCtx.strokeStyle = '#ddd';
             fppCtx.stroke();
 
             fppCtx.beginPath();
@@ -715,7 +718,6 @@
                     <span onclick="loadTrack(${originalIndex})" style="flex:1;">🎵 ${track.name}</span>
                     <button class="delete-disc" onclick="deleteTrack(${originalIndex})">✕</button>
                 `;
-                // Fix scope of delete button class selector name mapping
                 item.querySelector('.delete-disc').className = 'delete-btn';
                 libraryList.appendChild(item);
             });
@@ -774,7 +776,6 @@
             renderAlbums();
         }
 
-        // Scratch mechanics on big turntable
         function getAngle(x, y) {
             return Math.atan2(y - CENTER, x - CENTER);
         }
