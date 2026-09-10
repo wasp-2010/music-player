@@ -116,7 +116,7 @@
 
         /* Left Column: The Turntable */
         .turntable-section {
-            width: 45%;
+            width: 50%;
             background: var(--turntable-bg);
             border-right: 2px solid var(--border-color);
             display: flex;
@@ -130,7 +130,7 @@
 
         #vinylCanvas {
             position: absolute;
-            left: -175px;
+            left: -280px;
             cursor: grab;
             user-select: none;
             -webkit-user-select: none;
@@ -140,23 +140,12 @@
         #vinylCanvas.is-dragging { cursor: grabbing; }
 
         .now-playing-label {
-            position: absolute;
-            bottom: 30px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: var(--accent);
-            text-align: center;
-            padding: 0 20px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 80%;
-            z-index: 10;
+            display: none;
         }
 
         /* Right Column: Navigation & Content */
         .content-section {
-            width: 55%;
+            width: 50%;
             padding: 30px 30px 140px 30px;
             display: flex;
             flex-direction: column;
@@ -509,8 +498,8 @@
 
     <!-- LEFT: TURNTABLE WITH BIG HALF-HIDDEN VINYL -->
     <div class="turntable-section">
-        <canvas id="vinylCanvas" width="600" height="600"></canvas>
-        <div class="now-playing-label" id="nowPlayingText">No track selected</div>
+        <canvas id="vinylCanvas" width="720" height="720"></canvas>
+        <div class="now-playing-label" id="nowPlayingText"></div>
     </div>
 
     <!-- RIGHT: NAVIGATION TABS & CONTENT -->
@@ -616,10 +605,10 @@
         const authSwitchText = document.getElementById('authSwitchText');
         const loggedUserText = document.getElementById('loggedUserText');
 
-        const CANVAS_SIZE = 600;
+        const CANVAS_SIZE = 720;
         const CENTER = CANVAS_SIZE / 2;
-        const OUTER_RADIUS = 280;
-        const LABEL_RADIUS = 90;
+        const OUTER_RADIUS = 345;
+        const LABEL_RADIUS = 105;
 
         let db = null;
         let isSignUpMode = false;
@@ -633,7 +622,9 @@
         let lastTime = 0;
         let spinVelocity = 0;
         let currentRotation = 0;
-        const NORMAL_SPEED_RAD = (Math.PI * 2 * (180 / 360)); 
+        
+        // 1 full spin (2 * PI radians) takes 8 seconds -> radians per second = (2 * PI) / 8
+        const NORMAL_SPEED_RAD = (Math.PI * 2) / 8; 
         let currentVinylImg = null;
         let lastFrameTime = performance.now();
 
@@ -736,7 +727,7 @@
             albums = [];
             currentTrackIndex = -1;
             currentVinylImg = null;
-            nowPlayingText.innerText = 'No track selected';
+            nowPlayingText.innerText = '';
             fppTitle.innerText = 'No track playing';
             renderLibrary();
             renderAlbums();
@@ -816,44 +807,62 @@
         function drawVinyl(rotation) {
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-            ctx.beginPath();
-            ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = '#111';
-            ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#222';
-            ctx.stroke();
-
-            ctx.beginPath();
-            for(let i = LABEL_RADIUS + 25; i < OUTER_RADIUS - 15; i += 8) {
-                 ctx.arc(CENTER, CENTER, i, 0, Math.PI * 2);
-            }
-            ctx.stroke();
-
+            // 1. Draw the full-disc picture artwork underneath if available
             ctx.save();
             ctx.translate(CENTER, CENTER);
             ctx.rotate(rotation);
 
             ctx.beginPath();
-            ctx.arc(0, 0, LABEL_RADIUS, 0, Math.PI * 2);
+            ctx.arc(0, 0, OUTER_RADIUS, 0, Math.PI * 2);
             ctx.clip();
 
             if (currentVinylImg && currentVinylImg.complete) {
-                ctx.drawImage(currentVinylImg, -LABEL_RADIUS, -LABEL_RADIUS, LABEL_RADIUS * 2, LABEL_RADIUS * 2);
+                ctx.drawImage(currentVinylImg, -OUTER_RADIUS, -OUTER_RADIUS, OUTER_RADIUS * 2, OUTER_RADIUS * 2);
             } else {
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(-LABEL_RADIUS, -LABEL_RADIUS, LABEL_RADIUS * 2, LABEL_RADIUS * 2);
+                ctx.fillStyle = '#111';
+                ctx.fillRect(-OUTER_RADIUS, -OUTER_RADIUS, OUTER_RADIUS * 2, OUTER_RADIUS * 2);
             }
             ctx.restore();
 
+            // 2. Add vinyl groove lines and dark transparent sheen over the artwork
+            ctx.save();
+            ctx.translate(CENTER, CENTER);
+            ctx.rotate(rotation);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, OUTER_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.fill();
+
+            // Grooves
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            for(let i = LABEL_RADIUS + 15; i < OUTER_RADIUS - 10; i += 6) {
+                ctx.beginPath();
+                ctx.arc(0, 0, i, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Outer border edge
+            ctx.beginPath();
+            ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#222';
+            ctx.stroke();
+
+            // 3. Solid center label circle (pure white with center spindle hole)
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, LABEL_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#ddd';
             ctx.stroke();
 
+            // Center spindle hole
             ctx.beginPath();
-            ctx.arc(CENTER, CENTER, 8, 0, Math.PI * 2);
+            ctx.arc(CENTER, CENTER, 9, 0, Math.PI * 2);
             ctx.fillStyle = '#111';
             ctx.fill();
             ctx.strokeStyle = '#444';
@@ -868,43 +877,60 @@
 
             fppCtx.clearRect(0, 0, size, size);
 
-            fppCtx.beginPath();
-            fppCtx.arc(center, center, outerR, 0, Math.PI * 2);
-            fppCtx.fillStyle = '#111';
-            fppCtx.fill();
-            fppCtx.lineWidth = 1.5;
-            fppCtx.strokeStyle = '#333';
-            fppCtx.stroke();
-
-            fppCtx.beginPath();
-            for(let i = labelR + 8; i < outerR - 5; i += 4) {
-                 fppCtx.arc(center, center, i, 0, Math.PI * 2);
-            }
-            fppCtx.stroke();
-
+            // 1. Full picture artwork for mini vinyl
             fppCtx.save();
             fppCtx.translate(center, center);
             fppCtx.rotate(rotation);
+
             fppCtx.beginPath();
-            fppCtx.arc(0, 0, labelR, 0, Math.PI * 2);
+            fppCtx.arc(0, 0, outerR, 0, Math.PI * 2);
             fppCtx.clip();
 
             if (currentVinylImg && currentVinylImg.complete) {
-                fppCtx.drawImage(currentVinylImg, -labelR, -labelR, labelR * 2, labelR * 2);
+                fppCtx.drawImage(currentVinylImg, -outerR, -outerR, outerR * 2, outerR * 2);
             } else {
-                fppCtx.fillStyle = '#ffffff';
-                fppCtx.fillRect(-labelR, -labelR, labelR * 2, labelR * 2);
+                fppCtx.fillStyle = '#111';
+                fppCtx.fillRect(-outerR, -outerR, outerR * 2, outerR * 2);
+            }
+            fppCtx.restore();
+
+            // 2. Grooves and overlay sheen
+            fppCtx.save();
+            fppCtx.translate(center, center);
+            fppCtx.rotate(rotation);
+
+            fppCtx.beginPath();
+            fppCtx.arc(0, 0, outerR, 0, Math.PI * 2);
+            fppCtx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            fppCtx.fill();
+
+            fppCtx.lineWidth = 1;
+            fppCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            for(let i = labelR + 6; i < outerR - 4; i += 3) {
+                fppCtx.beginPath();
+                fppCtx.arc(0, 0, i, 0, Math.PI * 2);
+                fppCtx.stroke();
             }
             fppCtx.restore();
 
             fppCtx.beginPath();
+            fppCtx.arc(center, center, outerR, 0, Math.PI * 2);
+            fppCtx.lineWidth = 1.5;
+            fppCtx.strokeStyle = '#333';
+            fppCtx.stroke();
+
+            // 3. Center label
+            fppCtx.beginPath();
             fppCtx.arc(center, center, labelR, 0, Math.PI * 2);
+            fppCtx.fillStyle = '#ffffff';
+            fppCtx.fill();
             fppCtx.lineWidth = 1.5;
             fppCtx.strokeStyle = '#ddd';
             fppCtx.stroke();
 
             fppCtx.beginPath();
             fppCtx.arc(center, center, 4, 0, Math.PI * 2);
+            fppCtx.fillStyle = '#111';
             fppCtx.fill();
             fppCtx.strokeStyle = '#444';
             fppCtx.stroke();
@@ -1146,7 +1172,7 @@
 
             audioPlayer.src = track.url;
             audioPlayer.playbackRate = 1.0;
-            nowPlayingText.innerText = track.name;
+            nowPlayingText.innerText = '';
             fppTitle.innerText = track.name;
             renderLibrary(searchInput.value);
             
@@ -1172,7 +1198,7 @@
             if (currentTrackIndex === index) {
                 audioPlayer.pause();
                 audioPlayer.src = '';
-                nowPlayingText.innerText = 'No track selected';
+                nowPlayingText.innerText = '';
                 fppTitle.innerText = 'No track playing';
                 fppPlayPauseBtn.innerText = '▶';
                 currentVinylImg = null;
@@ -1198,10 +1224,6 @@
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             spinVelocity = 0; 
-            if (audioPlayer.src) {
-                audioPlayer.play();
-                fppPlayPauseBtn.innerText = '⏸';
-            }
             canvas.classList.add('is-dragging');
             const rect = canvas.getBoundingClientRect();
             lastAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
@@ -1233,14 +1255,22 @@
             const timeDelta = currentTime - lastTime;
             if (timeDelta > 0) {
                 spinVelocity = deltaAngle / (timeDelta / 1000);
-                let calculatedRate = Math.abs(spinVelocity / NORMAL_SPEED_RAD);
-                audioPlayer.playbackRate = Math.max(0.2, Math.min(calculatedRate, 5.0));
+                
+                if (!audioPlayer.paused) {
+                    let calculatedRate = Math.abs(spinVelocity / NORMAL_SPEED_RAD);
+                    audioPlayer.playbackRate = Math.max(0.2, Math.min(calculatedRate, 5.0));
+                }
             }
 
-            const deltaDegrees = deltaAngle * (180 / Math.PI);
-            const seekSeconds = deltaDegrees / 90;
+            const seekSeconds = deltaAngle * (4 / Math.PI);
             let newTime = audioPlayer.currentTime + seekSeconds;
             audioPlayer.currentTime = Math.max(0, Math.min(newTime, audioPlayer.duration));
+
+            if (audioPlayer.duration) {
+                const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                seekSlider.value = progressPercent;
+                currentTimeText.innerText = formatTime(audioPlayer.currentTime);
+            }
 
             lastAngle = currentMouseAngle;
             lastTime = currentTime;
