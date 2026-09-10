@@ -12,7 +12,7 @@
             --bg-base: #111;
             --bg-card: #181818;
             --bg-hover: #282828;
-            --turntable-bg: #151515;
+            --turntable-bg: #111;
             --accent: #ff4747;
             --text-main: #eee;
             --text-sub: #888;
@@ -24,7 +24,7 @@
             --bg-base: #f4f4f6;
             --bg-card: #ffffff;
             --bg-hover: #e5e5ea;
-            --turntable-bg: #e2e2e6;
+            --turntable-bg: #f4f4f6;
             --accent: #ff3b30;
             --text-main: #111111;
             --text-sub: #666666;
@@ -117,15 +117,14 @@
         /* Left Column: The Turntable */
         .turntable-section {
             width: 50%;
-            background: var(--turntable-bg);
-            border-right: 2px solid var(--border-color);
+            background: var(--bg-base);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             position: relative;
             overflow: hidden;
-            transition: background 0.3s, border-color 0.3s;
+            transition: background 0.3s;
         }
 
         #vinylCanvas {
@@ -136,6 +135,7 @@
             -webkit-user-select: none;
             border-radius: 50%;
             box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            touch-action: none;
         }
         #vinylCanvas.is-dragging { cursor: grabbing; }
 
@@ -263,7 +263,7 @@
             flex: 1;
             overflow-y: auto;
             border: 1px solid var(--border-color);
-            background: var(--bg-card);
+            background: var(--bg-base);
             border-radius: 12px;
             padding: 20px;
             display: flex;
@@ -276,19 +276,44 @@
 
         /* Search Input */
         .search-input {
-            width: 100%;
-            background: var(--bg-base);
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+            background: var(--bg-card);
             border: 1px solid var(--border-color);
-            padding: 10px 15px;
-            border-radius: 8px;
             color: var(--text-main);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             margin-bottom: 15px;
             box-sizing: border-box;
-        }
-        .search-input:focus {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: width 0.3s ease, border-radius 0.3s ease, padding 0.3s ease, transform 0.2s, border-color 0.2s;
             outline: none;
+        }
+        
+        .search-input::placeholder {
+            color: var(--text-main);
+            opacity: 1;
+        }
+
+        .search-input:focus {
+            width: 100%;
+            height: 40px;
+            padding: 10px 15px;
+            border-radius: 8px;
             border-color: var(--accent);
+            cursor: text;
+            text-align: left;
+        }
+
+        .search-input:focus::placeholder {
+            color: var(--text-sub);
+            opacity: 0.7;
         }
 
         /* Track List Items */
@@ -354,6 +379,7 @@
             border-radius: 50%;
             box-shadow: -5px 5px 20px rgba(0,0,0,0.5);
             cursor: grab;
+            touch-action: none;
         }
         .fpp-artwork-container.is-dragging { cursor: grabbing; }
 
@@ -376,10 +402,28 @@
             min-width: 0;
         }
 
+        /* Rotated Vertical Title like requested */
+        .fpp-title-container {
+            position: relative;
+            height: 22px;
+            min-width: 0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+
         .fpp-title {
-            font-size: 0.9rem;
+            position: absolute;
+            right: 0;
+            font-size: 0.75rem;
             font-weight: bold;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
             white-space: nowrap;
+            max-height: 100px;
             overflow: hidden;
             text-overflow: ellipsis;
         }
@@ -479,6 +523,37 @@
             color: var(--text-sub);
             margin-top: 30px;
         }
+
+        /* Mobile Responsive Adjustments */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                height: 100vh;
+                overflow-y: auto;
+            }
+            .turntable-section {
+                width: 100%;
+                height: 280px;
+                min-height: 280px;
+            }
+            #vinylCanvas {
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            .content-section {
+                width: 100%;
+                height: auto;
+                flex: 1;
+                padding: 15px 15px 130px 15px;
+            }
+            .floating-pill-player {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: 15px;
+                padding: 14px 16px 14px 75px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -496,7 +571,7 @@
         </div>
     </div>
 
-    <!-- LEFT: TURNTABLE WITH BIG HALF-HIDDEN VINYL -->
+    <!-- LEFT: TURNTABLE WITH BIG VINYL -->
     <div class="turntable-section">
         <canvas id="vinylCanvas" width="720" height="720"></canvas>
         <div class="now-playing-label" id="nowPlayingText"></div>
@@ -528,7 +603,7 @@
             <!-- LIBRARY VIEW -->
             <div id="libraryView" class="view-pane active">
                 <!-- Search Input Bar -->
-                <input type="text" id="searchInput" class="search-input" placeholder="Search your imported songs..." oninput="filterLibrary()">
+                <input type="text" id="searchInput" class="search-input" placeholder="🔍" oninput="filterLibrary()">
 
                 <div id="libraryList" class="track-list">
                     <div class="empty-state">Your imported songs will appear here.</div>
@@ -544,15 +619,18 @@
         </div>
     </div>
 
-    <!-- FLOATING PILL PLAYER WIDGET WITH HALF-HIDDEN VINYL -->
+    <!-- FLOATING PILL PLAYER WIDGET -->
     <div class="floating-pill-player">
         <div class="fpp-artwork-container" id="fppArtworkContainer">
             <canvas id="fppVinylCanvas" width="130" height="130"></canvas>
         </div>
         <div class="fpp-content">
             <div class="fpp-top-info">
-                <span class="fpp-title" id="fppTitle">No track playing</span>
-                <span class="fpp-subtitle">BLAZE VINYL RECORDS</span>
+                <!-- Rotated vertical title layout matching reference image -->
+                <div class="fpp-title-container">
+                    <span class="fpp-title" id="fppTitle">No track playing</span>
+                </div>
+                <span class="fpp-subtitle">WASP VINYL RECORDS</span>
             </div>
             <div class="fpp-seek-container">
                 <input type="range" id="seekSlider" class="fpp-seekbar" value="0" min="0" max="100" step="0.1" oninput="seekAudio(this.value)">
@@ -623,7 +701,6 @@
         let spinVelocity = 0;
         let currentRotation = 0;
         
-        // 1 full spin (2 * PI radians) takes 8 seconds -> radians per second = (2 * PI) / 8
         const NORMAL_SPEED_RAD = (Math.PI * 2) / 8; 
         let currentVinylImg = null;
         let lastFrameTime = performance.now();
@@ -807,7 +884,6 @@
         function drawVinyl(rotation) {
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-            // 1. Draw the full-disc picture artwork underneath if available
             ctx.save();
             ctx.translate(CENTER, CENTER);
             ctx.rotate(rotation);
@@ -824,7 +900,6 @@
             }
             ctx.restore();
 
-            // 2. Add vinyl groove lines and dark transparent sheen over the artwork
             ctx.save();
             ctx.translate(CENTER, CENTER);
             ctx.rotate(rotation);
@@ -834,7 +909,6 @@
             ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
             ctx.fill();
 
-            // Grooves
             ctx.lineWidth = 1;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
             for(let i = LABEL_RADIUS + 15; i < OUTER_RADIUS - 10; i += 6) {
@@ -844,14 +918,12 @@
             }
             ctx.restore();
 
-            // Outer border edge
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
             ctx.lineWidth = 3;
             ctx.strokeStyle = '#222';
             ctx.stroke();
 
-            // 3. Solid center label circle (pure white with center spindle hole)
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, LABEL_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
@@ -860,7 +932,6 @@
             ctx.strokeStyle = '#ddd';
             ctx.stroke();
 
-            // Center spindle hole
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, 9, 0, Math.PI * 2);
             ctx.fillStyle = '#111';
@@ -877,7 +948,6 @@
 
             fppCtx.clearRect(0, 0, size, size);
 
-            // 1. Full picture artwork for mini vinyl
             fppCtx.save();
             fppCtx.translate(center, center);
             fppCtx.rotate(rotation);
@@ -894,7 +964,6 @@
             }
             fppCtx.restore();
 
-            // 2. Grooves and overlay sheen
             fppCtx.save();
             fppCtx.translate(center, center);
             fppCtx.rotate(rotation);
@@ -919,7 +988,6 @@
             fppCtx.strokeStyle = '#333';
             fppCtx.stroke();
 
-            // 3. Center label
             fppCtx.beginPath();
             fppCtx.arc(center, center, labelR, 0, Math.PI * 2);
             fppCtx.fillStyle = '#ffffff';
@@ -967,29 +1035,29 @@
                 durationText.innerText = formatTime(audioPlayer.duration);
             }
 
-            if (isDragging) {
-                // Handled via mousemove event
-            } else if (Math.abs(spinVelocity) > 0.01) {
-                currentRotation += spinVelocity * deltaTime;
-                const targetVelocity = audioPlayer.paused ? 0 : NORMAL_SPEED_RAD;
-                spinVelocity += (targetVelocity - spinVelocity) * Math.min(1, deltaTime * 3);
+            if (!isDragging) {
+                if (Math.abs(spinVelocity) > 0.01) {
+                    currentRotation += spinVelocity * deltaTime;
+                    const targetVelocity = audioPlayer.paused ? 0 : NORMAL_SPEED_RAD;
+                    spinVelocity += (targetVelocity - spinVelocity) * Math.min(1, deltaTime * 3);
 
-                if (audioPlayer.src && !audioPlayer.paused) {
-                    let calculatedRate = Math.abs(spinVelocity / NORMAL_SPEED_RAD);
-                    audioPlayer.playbackRate = Math.max(0.2, Math.min(calculatedRate, 5.0));
+                    if (audioPlayer.src && !audioPlayer.paused) {
+                        let calculatedRate = Math.abs(spinVelocity / NORMAL_SPEED_RAD);
+                        audioPlayer.playbackRate = Math.max(0.2, Math.min(calculatedRate, 5.0));
+                    }
+
+                    drawVinyl(currentRotation);
+                    drawMiniVinyl(currentRotation);
+                } else if (!audioPlayer.paused) {
+                    currentRotation += NORMAL_SPEED_RAD * deltaTime;
+                    audioPlayer.playbackRate = 1.0;
+                    drawVinyl(currentRotation);
+                    drawMiniVinyl(currentRotation);
+                    spinVelocity = NORMAL_SPEED_RAD;
+                } else {
+                    drawVinyl(currentRotation);
+                    drawMiniVinyl(currentRotation);
                 }
-
-                drawVinyl(currentRotation);
-                drawMiniVinyl(currentRotation);
-            } else if (!audioPlayer.paused) {
-                currentRotation += NORMAL_SPEED_RAD * deltaTime;
-                audioPlayer.playbackRate = 1.0;
-                drawVinyl(currentRotation);
-                drawMiniVinyl(currentRotation);
-                spinVelocity = NORMAL_SPEED_RAD;
-            } else {
-                drawVinyl(currentRotation);
-                drawMiniVinyl(currentRotation);
             }
 
             requestAnimationFrame(mainLoop);
@@ -1221,28 +1289,21 @@
             return Math.atan2(y - CENTER, x - CENTER);
         }
 
-        canvas.addEventListener('mousedown', (e) => {
+        // --- Mouse & Touch Scratch/Drag Event Handlers ---
+        
+        function handleDragStart(clientX, clientY, rect) {
             isDragging = true;
             spinVelocity = 0; 
             canvas.classList.add('is-dragging');
-            const rect = canvas.getBoundingClientRect();
-            lastAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
+            lastAngle = getAngle(clientX - rect.left, clientY - rect.top);
             lastTime = performance.now();
-        });
+        }
 
-        window.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                canvas.classList.remove('is-dragging');
-            }
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
+        function handleDragMove(clientX, clientY, rect) {
             if (!isDragging || !audioPlayer.src) return;
 
-            const rect = canvas.getBoundingClientRect();
             const currentTime = performance.now();
-            const currentMouseAngle = getAngle(e.clientX - rect.left, e.clientY - rect.top);
+            const currentMouseAngle = getAngle(clientX - rect.left, clientY - rect.top);
             
             let deltaAngle = currentMouseAngle - lastAngle;
             if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
@@ -1274,7 +1335,44 @@
 
             lastAngle = currentMouseAngle;
             lastTime = currentTime;
+        }
+
+        function handleDragEnd() {
+            if (isDragging) {
+                isDragging = false;
+                canvas.classList.remove('is-dragging');
+            }
+        }
+
+        // Mouse Events
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            handleDragStart(e.clientX, e.clientY, rect);
         });
+        window.addEventListener('mouseup', handleDragEnd);
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            handleDragMove(e.clientX, e.clientY, rect);
+        });
+
+        // Touch Events for Mobile
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                handleDragStart(e.touches[0].clientX, e.touches[0].clientY, rect);
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', handleDragEnd);
+        
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                handleDragMove(e.touches.clientX, e.touches.clientY, rect);
+                e.preventDefault();
+            }
+        }, { passive: false });
 
         init();
     </script>
